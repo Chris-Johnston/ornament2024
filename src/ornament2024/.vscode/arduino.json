@@ -3,6 +3,6 @@
     "board": "megaTinyCore:megaavr:atxy4",
     "port": "COM3",
     "programmer": "megaTinyCore:serialupdi",
-    "sketch": "ornament2024code.ino",
+    "sketch": "ornament2024.ino",
     "output": "./out"
 }

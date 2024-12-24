@@ -1,15 +1,30 @@
 // ornament 2024 code
 
+// This code is messy - I do not care. You have been warned.
+
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <util/delay.h>
+#include <avr/pgmspace.h>
+#include <pins_arduino.h>
+#include "ornament.h"
+
 #define PIN_OUTPUT_COUNT 6
 #define PIN_BUTTON 2
 
 #undef MILLIS_USE_TIMERB0
 
+// Clockwise starting from the top
 int pins[] = {
   3, 0, 1, 10, 9, 8
 };
 
-#define CORRECTED_MILLIS (millis() / 8)
+// I broke the millis() timer when setting up the ISR
+// and I do not care enough to fix it.
+// This is fine.
+// nevermind I wasn't using TIMERA0 anyways so reverted this change
+
+#define CORRECTED_MILLIS (millis())
 #define CORRECTED_DELAY(ms) (delay(ms))
 
 // 8       3
@@ -19,18 +34,9 @@ int pins[] = {
 unsigned long lastDebounceTime = 0;
 int pattern = 0;
 
-#include <avr/io.h>
-#include <avr/interrupt.h>
-#include <util/delay.h>
-#include <avr/pgmspace.h>
-#include <pins_arduino.h>
-#include "ornament.h"
-
 void setupIsr();
-
 void clear();
 
-// the setup function runs once when you press reset or power the board
 void setup() {
   
   for (int i = 0; i < PIN_OUTPUT_COUNT; i++)
@@ -41,40 +47,16 @@ void setup() {
 
   setupIsr();
 
-  // look into using the VREF features so that I can see how drained the battery is
+  // TODO: look into using the VREF features so that I can see how drained the battery is
 }
 
 int lastButtonState = 0;
 int buttonState = 0;
 
-void handleDebounce()
-{
-  // this shit doesn't work and I should just set up the interrupt instead
-  bool reading = !digitalRead(PIN_BUTTON);
-  if (reading != lastButtonState)
-  {
-    lastDebounceTime = CORRECTED_MILLIS;
-  }
-  if ((CORRECTED_MILLIS - lastDebounceTime) > 50)
-  {
-    if (reading != buttonState)
-    {
-      buttonState = reading;
-      if (reading)
-      {
-        pattern = (pattern + 1) % NUM_PATTERNS;
-        clear();
-      }
-    }
-  }
-  lastButtonState = reading;
-}
-
+// state used for software PWM
 uint8_t pwmTimers[PIN_OUTPUT_COUNT];
 bool pwmTimersEnabled[PIN_OUTPUT_COUNT];
 int pwmTimer = 0;
-
-// digital_pin_to_bit_mask
 
 void setPwm(int pin, bool pwmEnabled, int pwmRate)
 {
@@ -91,18 +73,12 @@ void setPwm(int pin, bool pwmEnabled, int pwmRate)
 ISR(TCB0_INT_vect) {
 
   pwmTimer = (pwmTimer + 1) % 255;
-  // uint8_t portaValue = 0;
-  // if bit set, indicates that the value
-  // should overwrite whatever's in the register
-  /// uint8_t controlMask = 0;
   uint8_t portASet = 0, portAClear = 0;
   
   for (int i = 0; i < PIN_OUTPUT_COUNT; i++) {
     // preserve whatevers already in the register
     if (pwmTimersEnabled[i] == false) continue;
-    // this was still showing up as on because of <=
-    // if (pwmTimers[i] == 0) continue;
-
+    
     if (pwmTimer < pwmTimers[i]) {
       portASet |= digital_pin_to_bit_mask[pins[i]];
     }
@@ -111,11 +87,23 @@ ISR(TCB0_INT_vect) {
     }
   }
 
-  // PORTA.OUT = (PORTA.OUT & ~controlMask) | (portaValue & controlMask);
   PORTA.OUTSET = portASet;
   PORTA.OUTCLR = portAClear;
 
   TCB0.INTFLAGS = 0; // clear interrupt
+}
+
+ISR(PORTA_PORT_vect) {
+  byte flags = PORTA.INTFLAGS;
+  PORTA.INTFLAGS |= flags;
+  
+  if ((CORRECTED_MILLIS - lastDebounceTime) > 50) {
+
+    pattern = (pattern + 1) % NUM_PATTERNS;
+    clear();
+
+    lastDebounceTime = CORRECTED_MILLIS;
+  }
 }
 
 #define TCB0_CTRLA_ENABLE 1
@@ -125,25 +113,33 @@ ISR(TCB0_INT_vect) {
 #define TCB0_CTRLB_PERIODIC_INTERRUPT_MODE 0b00
 
 void setupIsr() {
-  // TCA0.CTRLA = 0;
-  TCA0.SINGLE.CTRLA = 0b0001;
-  // TCA0.SINGLE.PER = 0xff;
-  // takeOverTCA0();
-  // takeOverTCA1();
-  // takeOverTCD0();
-  // use TCB0 because TCA0 is in use 
   TCB0.CCMP = 0xff;
-  // TCB0_CTRLB_ASYNC
   TCB0.CTRLB = TCB0_CTRLB_ASYNC | TCB0_CTRLB_PERIODIC_INTERRUPT_MODE;
-  // set prescaler in TCB0.CRTLA
   TCB0.INTCTRL = 1 ; // no capture interrupt
   TCB0.CTRLA = TCB0_CTRLA_CLKSEL_half | TCB0_CTRLA_ENABLE;
   
+  // pin 2 interrupt
+  // bit 7 invert I/O
+  // pull up enabled (bit 3)
+  // bits 2:0 - sense falling edge
+  // PORTA_PIN2CTRL = 0b1000 | 0x3;
+
+  // pin 2 is actually pa6
+  PORTA.INTFLAGS = (1 << 6);// 0b100;
+  PORTA.PIN6CTRL = 0b10000000 | 0b1000 | 0b11;
+  VPORTA.INTFLAGS = (1 << 6);
+  // PORTA.INTCTRL = 1;
+  // PORTA.PIN2CTRL = 0b1011;
 }
 
-// anything beyond this is too dang bright
-#define MAX_PWM_BRIGHTNESS 50
+// this was necessary when I didn't use the right value of resistor
+// but has been fixed now, should be fine to use the full range of resistor
+// without burning anyone's eyes
+// additionally this prevents LEDs being on way too bright if the board browns out or
+// gets stuck.
 
+// anything beyond this is too dang bright
+// #define MAX_PWM_BRIGHTNESS 50
 
 void showPattern()
 {
@@ -152,57 +148,7 @@ void showPattern()
 
 void loop()
 {
-  handleDebounce();
   showPattern();
-
-  // init
-
-  // for (int i = 0; i < PIN_OUTPUT_COUNT; i++) {
-  //   // pwmTimers[i] = i * ((MAX_PWM_BRIGHTNESS)/PIN_OUTPUT_COUNT);
-  //   pwmTimers[i] = (i % 2 == 1) ? 255 : 128;
-  //   pwmTimersEnabled[i] = true;
-  // }
-
-  return;
-
-  while (true) {
-    #ifdef LINEAR
-    for (int i = 0; i < PIN_OUTPUT_COUNT; i++) {
-      pwmTimers[i] = (pwmTimers[i] + 5) % MAX_PWM_BRIGHTNESS;
-      // delay(1);
-    }
-    #endif
-
-    for (int i = 0; i < PIN_OUTPUT_COUNT; i++) {
-      // millis seems to update at the same interval as TCA, interesting
-      pwmTimers[i] = (MAX_PWM_BRIGHTNESS / 2) + (MAX_PWM_BRIGHTNESS / 2) * sin(( i * 2 * PI / PIN_OUTPUT_COUNT));
-    }
-
-    delay(100);
-
-  }
-
-
-  // int state = 0;
-  // while (true) {
-  //   for (pwm_duty = 0; pwm_duty < 175; pwm_duty += 25) {
-  //     // I think something about this is firing an interrupt
-  //     // but this takes forever
-  //     // and so as a result the 1ms delay takes maybe 250 ms
-  //     // _delay_ms(1);
-  //     // delay(1);
-  //     state = ~state;
-  //     digitalWrite(0, state);
-  //   }
-  // }
-    // for (int i = 0; i< 6; i++) {
-    // digitalWrite(pins[i], HIGH);
-    // delay(50);
-    // digitalWrite(pins[i], LOW);
-    // delay(50);
-  // }
-
-  return;
 }
 
 void clear()
@@ -215,8 +161,9 @@ void clear()
 
 void offPattern()
 {
-  // nothing
-  delay(5);
+  // nothing - no point in doing this
+  clear();
+  delay(100);
 }
 
 void randomBlinkPattern() {
@@ -233,8 +180,18 @@ void defaultPattern() {
 }
 
 void spinPattern() {
+
+  delay(25);
+  return;
   clear();
-  // millis is off by 8
   int on = (CORRECTED_MILLIS / 1000) % PIN_OUTPUT_COUNT;
   digitalWrite(pins[on], HIGH);
+}
+
+void debugPattern() {
+  bool state = (CORRECTED_MILLIS / 1000) % 2;
+  digitalWrite(pins[0], state);
+
+  // digitalWrite(pins[1], test);
+  // digitalWrite(pins[2], test);
 }

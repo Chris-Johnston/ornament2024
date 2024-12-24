@@ -12,16 +12,19 @@ void offPattern();
 void randomBlinkPattern();
 void defaultPattern();
 void spinPattern();
+void debugPattern();
 
 typedef void (*PatternFunction)();
 
 PatternFunction patternList[] = {
+    &debugPattern,
     &spinPattern,
     &defaultPattern,
     &randomBlinkPattern,
     &offPattern,
 };
 
+// wasn't sure if this was breaking something
 // #define NUM_PATTERNS (sizeof(patternList) / sizeof(PatternFunction))
 
-#define NUM_PATTERNS 4
+#define NUM_PATTERNS 5
