@@ -10,21 +10,39 @@
 
 void offPattern();
 void randomBlinkPattern();
+void snowPattern();
 void defaultPattern();
 void spinPattern();
+void spinReversePattern();
 void debugPattern();
+void sineSpinPattern();
+void decayPattern();
+void vSpinPattern();
+void clockPattern();
+void solidFullBrightnessPattern();
+void halfBrightnessPattern();
+void quarterBrightnessPattern();
 
 typedef void (*PatternFunction)();
 
 PatternFunction patternList[] = {
-    &debugPattern,
+    // &debugPattern,
+    // &sineSpinPattern,
+    &snowPattern, // this is a good one
+    &decayPattern, // and this is good too
+    &clockPattern,
+    &vSpinPattern,
     &spinPattern,
-    &defaultPattern,
+    &spinReversePattern,
+    // &defaultPattern,
     &randomBlinkPattern,
-    &offPattern,
+    &solidFullBrightnessPattern,
+    &halfBrightnessPattern,
+    &quarterBrightnessPattern,
+    // &offPattern,
 };
 
 // wasn't sure if this was breaking something
-// #define NUM_PATTERNS (sizeof(patternList) / sizeof(PatternFunction))
+#define NUM_PATTERNS (sizeof(patternList) / sizeof(PatternFunction))
 
-#define NUM_PATTERNS 5
+// #define NUM_PATTERNS 5

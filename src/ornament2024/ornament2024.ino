@@ -14,6 +14,8 @@
 
 #undef MILLIS_USE_TIMERB0
 
+#define DEBOUNCE_TIME 75
+
 // Clockwise starting from the top
 int pins[] = {
   3, 0, 1, 10, 9, 8
@@ -63,7 +65,7 @@ void setPwm(int pin, bool pwmEnabled, int pwmRate)
   pwmTimersEnabled[pin] = pwmEnabled;
   if (pwmEnabled)
   {
-    pwmTimers[pin] = pwmRate;
+    pwmTimers[pin] = pwmRate & 255;
   }
   else {
     pwmTimers[pin] = 0;
@@ -97,7 +99,7 @@ ISR(PORTA_PORT_vect) {
   byte flags = PORTA.INTFLAGS;
   PORTA.INTFLAGS |= flags;
   
-  if ((CORRECTED_MILLIS - lastDebounceTime) > 50) {
+  if ((CORRECTED_MILLIS - lastDebounceTime) > DEBOUNCE_TIME) {
 
     pattern = (pattern + 1) % NUM_PATTERNS;
     clear();
@@ -113,7 +115,7 @@ ISR(PORTA_PORT_vect) {
 #define TCB0_CTRLB_PERIODIC_INTERRUPT_MODE 0b00
 
 void setupIsr() {
-  TCB0.CCMP = 0xff;
+  TCB0.CCMP = 0xfff;
   TCB0.CTRLB = TCB0_CTRLB_ASYNC | TCB0_CTRLB_PERIODIC_INTERRUPT_MODE;
   TCB0.INTCTRL = 1 ; // no capture interrupt
   TCB0.CTRLA = TCB0_CTRLA_CLKSEL_half | TCB0_CTRLA_ENABLE;
@@ -149,25 +151,29 @@ void showPattern()
 void loop()
 {
   showPattern();
+  delay(50); // don't need to spin super fast
+}
+
+void clearPwm() {
+  for (int i = 0; i < PIN_OUTPUT_COUNT; i++) {
+    setPwm(i, false, 0);
+  }
 }
 
 void clear()
 {
-  for (int i = 0; i < PIN_OUTPUT_COUNT; i++) {
-    setPwm(i, false, 0);
-  }
+  clearPwm();
   PORTA.OUT = 0;
 }
 
 void offPattern()
 {
   // nothing - no point in doing this
-  clear();
-  delay(100);
 }
 
 void randomBlinkPattern() {
   clear();
+  delay(125 + rand() % 500);
   setPwm(rand() % PIN_OUTPUT_COUNT, true, rand() % 255);
   delay(50);
 }
@@ -176,22 +182,144 @@ void defaultPattern() {
   for (int i = 0; i < PIN_OUTPUT_COUNT; i++) {
     setPwm(i, true, (i % 2 == 1) ? 255 : 128);
   }
-  delay(25);
 }
 
 void spinPattern() {
+  // pretty sure these are getting stuck ons
+  clearPwm();
+  int on = (CORRECTED_MILLIS / 300) % PIN_OUTPUT_COUNT;
+  int bit = digital_pin_to_bit_mask[pins[on]];
+  PORTA.OUT = bit;
+}
 
-  delay(25);
-  return;
-  clear();
-  int on = (CORRECTED_MILLIS / 1000) % PIN_OUTPUT_COUNT;
-  digitalWrite(pins[on], HIGH);
+void spinReversePattern() {
+  // pretty sure these are getting stuck ons
+  clearPwm();
+  int on = (CORRECTED_MILLIS / 300) % PIN_OUTPUT_COUNT;
+  int bit = digital_pin_to_bit_mask[pins[(PIN_OUTPUT_COUNT - 1) - on]];
+  PORTA.OUT = bit;
+}
+
+void sineSpinPattern() {
+  for (int i = 0; i < PIN_OUTPUT_COUNT; i++) {
+    setPwm(i, true, (255/2) + (100.0) * sin( 6.28 * (i / 8.0) + (CORRECTED_MILLIS / 2500.0)));
+  }
+  delay(50);
+}
+
+// sin was too slow
+int vSpinPatternLUT[] = {0, 50, 255, 128, 50, 0 };
+
+void vSpinPattern() {
+  int offset = (int)(CORRECTED_MILLIS / 100.0) % PIN_OUTPUT_COUNT;
+
+  for (int i = 0; i < PIN_OUTPUT_COUNT; i++) {
+    setPwm(i, true, vSpinPatternLUT[(i + offset) % PIN_OUTPUT_COUNT]);
+  }
+}
+
+void clockPattern() {
+  clearPwm();
+  int time = ((int)(CORRECTED_MILLIS / 1000.0)) & 0b111111;
+  int portaValue = 0;
+
+  for (int i = 0; i < PIN_OUTPUT_COUNT; i++) {
+    portaValue |= (time & 1) * digital_pin_to_bit_mask[pins[i]];
+    time = time >> 1;
+  }
+
+  PORTA.OUT = portaValue;
+}
+
+void solidFullBrightnessPattern() {
+  clearPwm();
+  int portaValue = 0;
+  for (int i = 0; i < PIN_OUTPUT_COUNT; i++) {
+    portaValue |= digital_pin_to_bit_mask[pins[i]];
+  }
+  PORTA.OUT = portaValue;
+}
+
+void halfBrightnessPattern() {
+  for (int i = 0; i < PIN_OUTPUT_COUNT; i++) {
+    setPwm(i, true, 255/2);
+  }
+}
+
+void quarterBrightnessPattern() {
+  for (int i = 0; i < PIN_OUTPUT_COUNT; i++) {
+    setPwm(i, true, 255/4);
+  }
+}
+
+
+
+// turns an LED on and decays it over time
+unsigned long lastBlinkPatternTime = 0;
+void decayPattern() {
+
+  int period = 500 + rand() % 500;
+
+  if (lastBlinkPatternTime == 0 || ((CORRECTED_MILLIS - lastBlinkPatternTime) > period)) {
+    lastBlinkPatternTime = CORRECTED_MILLIS;
+
+    int r = rand() % PIN_OUTPUT_COUNT;
+    setPwm(r, true, 255);
+  }
+
+  for (int i = 0; i < PIN_OUTPUT_COUNT; i++) {
+    if (pwmTimers[i] > 0) {
+      pwmTimers[i] *= 0.9;
+    }
+  }
+}
+
+int snowPatternCounter = 0;
+
+// actually doesn't need to refer to the pin number
+// 8  3
+// 9  0
+// 10 1
+// since setPwm will look this up
+// so instead should refer to the clockwise order
+
+// 5  0
+// 4  1
+// 3  2
+//
+
+int snowPatternSequence[] = {
+  0, 1, 2,
+  5, 4, 3,
+  0, 5, 1, 4, 2, 3,
+  5, 4, 3,
+  5, 0, 4, 1, 3, 2,
+  0, 1, 2,
+  0, 5, 1, 4, 2, 3,
+};
+#define LEN_SNOW_SEQUENCE (sizeof(snowPatternSequence) / sizeof(int))
+
+void snowPattern() {
+
+  int period = 200 + rand() % 400;
+
+  if (lastBlinkPatternTime == 0 || ((CORRECTED_MILLIS - lastBlinkPatternTime) > period)) {
+    lastBlinkPatternTime = CORRECTED_MILLIS;
+
+    // int r = rand() % PIN_OUTPUT_COUNT;
+    // setPwm(r, true, 255);
+    snowPatternCounter = (snowPatternCounter + 1) % LEN_SNOW_SEQUENCE;
+    setPwm(snowPatternSequence[snowPatternCounter], true, 255);
+  }
+
+  for (int i = 0; i < PIN_OUTPUT_COUNT; i++) {
+    if (pwmTimers[i] > 0) {
+      pwmTimers[i] *= 0.7;
+    }
+  }
 }
 
 void debugPattern() {
   bool state = (CORRECTED_MILLIS / 1000) % 2;
   digitalWrite(pins[0], state);
-
-  // digitalWrite(pins[1], test);
-  // digitalWrite(pins[2], test);
 }
