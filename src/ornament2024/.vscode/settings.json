@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "wiring_private.h": "c",
+        "delay.h": "c"
+    }
+}

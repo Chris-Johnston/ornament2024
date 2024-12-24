@@ -1,0 +1,8 @@
+{
+    "configuration": "chip=404,clock=20internal,bodvoltage=1v8,bodmode=disabled,eesave=enable,millis=enabled,startuptime=8,wiremode=mors,printf=default,PWMmux=default,attach=allenabled,WDTtimeout=disabled,WDTwindow=disabled",
+    "board": "megaTinyCore:megaavr:atxy4",
+    "port": "COM3",
+    "programmer": "megaTinyCore:serialupdi",
+    "sketch": "ornament2024code.ino",
+    "output": "./out"
+}

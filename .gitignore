@@ -1,7 +1,7 @@
 # arduino build directory
 out/
 
-.vscode/c_cpp_properties.json
+c_cpp_properties.json
 
 # https://github.com/github/gitignore/blob/main/KiCad.gitignore
 # For PCBs designed using KiCad: https://www.kicad.org/
