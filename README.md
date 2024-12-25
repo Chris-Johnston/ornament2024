@@ -2,6 +2,8 @@
 
 Another ATTiny404-based LED Xmas tree ornament.
 
+![image of the ornament hanging from a tree](img/ornament_front.png)
+
 This is a continuation of a series of these boards that I've worked on in [2023], [2022], and [2021].
 
 [2023]: https://github.com/Chris-Johnston/ornament2023/
@@ -15,6 +17,8 @@ This year's iteration was pretty similar to [2023]'s wreath-shaped ornament. Som
 - Simplified the design and opted for single color LEDs, instead of the bi-color ones from the last 2 years
 
 Of these, the new design came out well and the exposed pads look nice. I used these on another board this year and I think I'll continue to do so in the future.
+
+![image of the ornaments sitting on a table](img/ornament_table.png)
 
 # Timeline
 
@@ -54,6 +58,8 @@ I was able to reuse [my UPDI board for programming these boards from 2 years ago
 | B1 | CR2023 Battery Holder | BH-25C-1 | |
 
 Unit cost without shipping: **TODO**
+
+![schematic screenshot in case I'm too lazy to open up kicad](img/schematic.png)
 
 # Oops
 
