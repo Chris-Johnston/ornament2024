@@ -4,10 +4,6 @@ Another ATTiny404-based LED Xmas tree ornament.
 
 ![image of the ornament hanging from a tree](img/ornament_front.png)
 
-<video width="240" height="320" controls>
-  <source src="img/example_video.mp4" type="video/mp4">
-</video> 
-
 This is a continuation of a series of these boards that I've worked on in [2023], [2022], and [2021].
 
 [2023]: https://github.com/Chris-Johnston/ornament2023/
